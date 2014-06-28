@@ -1,0 +1,15 @@
+&dist_nml
+  nproc_x = 2
+  nproc_y = 2
+/
+
+&domain_nml
+  p = 720
+  q = 360
+/
+&time_manager_nml
+  tlo = 200
+  t0 = 0
+  t1 = 8640000
+/
+

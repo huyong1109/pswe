@@ -3,6 +3,7 @@ MODULE module_para
 !
     use kinds_mod
     use communicate
+    use broadcast
     use exit_mod
     implicit none
 !------------------------constants-------------------- 
@@ -15,7 +16,7 @@ MODULE module_para
 !
 
 !------------------------domain ------------------------
-    integer		     :: nproc_x, nproc_y
+    integer		     ::	   nproc_x, nproc_y
 
 
 !------------------------grid domain -------------------- 
@@ -93,7 +94,8 @@ contains
 ! read domain information from namelist input
 !
 !----------------------------------------------------------------------
-
+   nproc_x =-1
+   nproc_y =-1
    p = -1
    q = -1
    tlo = -1
@@ -107,45 +109,34 @@ contains
       else
          nml_error = 1
       endif
-      do while (nml_error > 0)
-         read(nml_in, nml=dist_nml,iostat=nml_error)
-      end do
-      do while (nml_error > 0)
-	  read(nml_in, nml=domain_nml,iostat=nml_error)
-      end do
-      do while (nml_error > 0)
-         read(nml_in, nml=time_manager_nml,iostat=nml_error)
-      end do
-      if (nml_error == 0) close(nml_in)
+      read(nml_in, nml=dist_nml,iostat=nml_error)
+      read(nml_in, nml=domain_nml,iostat=nml_error)
+      read(nml_in, nml=time_manager_nml,iostat=nml_error)
 
-      !call broadcast_scalar(nml_error, master_task)
-      if (nml_error /= 0) then
-         call exit_PSWE(sigAbort,'ERROR reading pswe_in')
-      endif
+      
+      close(nml_in)
+   
 
-   !call broadcast_scalar(nproc_x, master_task)
-   !call broadcast_scalar(nproc_y, master_task)
-   !call broadcast_scalar(tlo, master_task)
-   !call broadcast_scalar(t0, master_task)
-   !call broadcast_scalar(t1, master_task)
+   endif
+      
+   call broadcast_scalar(nml_error, master_task)
+   if (nml_error /= 0) then
+      call exit_PSWE(sigAbort,'ERROR reading pswe_in')
+   endif
+
+   call broadcast_scalar(nproc_x, master_task)
+   call broadcast_scalar(nproc_y, master_task)
+   call broadcast_scalar(p, master_task)
+   call broadcast_scalar(q, master_task)
+   call broadcast_scalar(tlo, master_task)
+   call broadcast_scalar(t0, master_task)
+   call broadcast_scalar(t1, master_task)
 
 !---------------------------------------------------------------------- !
 ! perform some basic checks on domain
 !
 !----------------------------------------------------------------------
 
-   !if (my_task == master_task) then
-     write(stdout,'(a18)') 'Domain Information'
-     write(stdout,'(a26,i6)') '    proc_x = ', nproc_x
-     write(stdout,'(a26,i6)') '    proc_y = ', nproc_y
-     write(stdout,'(a26,i6)') '    nx_global = ', p
-     write(stdout,'(a26,i6)') '    ny_global = ', q
-     write(stdout,'(a18)') 'Time   Information'
-     write(stdout,'(a26,i6)') '    Start step = ', t0
-     write(stdout,'(a26,i6)') '    End   step = ', t1
-     write(stdout,'(a26,i6)') '    Step  size = ', tlo
-
-   !endif
 
    if (p < 1 .or. q  < 1 ) then
       !***
@@ -167,19 +158,21 @@ contains
     nm = (np-1)*n		   ! Total grid number
 !
      										   !
-
+   if (my_task == 1) then
    !if (my_task == master_task) then
+     write(stdout,'(a18)') 'Time   Information'
+     write(stdout,'(a26,i6)') '    Start step = ', t0
+     write(stdout,'(a26,i6)') '    Step  size = ', tlo
+     write(stdout,'(a26,i8)') '    End   step = ', t1
+
      write(stdout,'(a18)') 'Domain Information'
      write(stdout,'(a26,i6)') '    proc_x = ', nproc_x
      write(stdout,'(a26,i6)') '    proc_y = ', nproc_y
+      
+      
      write(stdout,'(a26,i6)') '    nx_global = ', p
      write(stdout,'(a26,i6)') '    ny_global = ', q
-     write(stdout,'(a18)') 'Time   Information'
-     write(stdout,'(a26,i6)') '    Start step = ', t0
-     write(stdout,'(a26,i6)') '    End   step = ', t1
-     write(stdout,'(a26,i6)') '    Step  size = ', tlo
 
-   !endif
 
    endif
 
