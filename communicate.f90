@@ -24,8 +24,7 @@
 
    public :: init_communicate, &
               exit_message_environment, &
-              abort_message_environment, &
-              get_num_procs, &
+              abort_message_environment
 
 ! !PUBLIC DATA MEMBERS:
 
@@ -83,6 +82,7 @@
 
    master_task = 0
    call MPI_COMM_RANK (MPI_COMM_WORLD, my_task, ierr)
+   call MPI_COMM_SIZE (MPI_COMM_WORLD, nprocs, ierr)
 
 !-----------------------------------------------------------------------
 !
@@ -93,48 +93,12 @@
 !-----------------------------------------------------------------------
 
    MPI_DBL = MPI_DOUBLE_PRECISION
+   write(*,'(a26, i6, i6)') 'myproc/NPRORC = ', my_task, nprocs
 
 !-----------------------------------------------------------------------
 !EOC
 
  end subroutine init_communicate
-
-!***********************************************************************
-!BOP
-! !IROUTINE: get_num_procs
-! !INTERFACE:
-
- function get_num_procs()
-
-! !DESCRIPTION:
-! This function returns the number of processor assigned to
-! MPI_COMM_OCN
-!
-! !REVISION HISTORY:
-! same as module
-
-! !OUTPUT PARAMETERS:
-
-   integer (int_kind) :: get_num_procs
-
-!EOP
-!BOC
-!-----------------------------------------------------------------------
-!
-! local variables
-!
-!-----------------------------------------------------------------------
-
-   integer (int_kind) :: ierr
-
-!-----------------------------------------------------------------------
-
-   call MPI_COMM_SIZE(MPI_COMM_OCN, get_num_procs, ierr)
-
-!-----------------------------------------------------------------------
-!EOC
-
- end function get_num_procs
 
 !***********************************************************************
 !BOP
@@ -195,7 +159,7 @@
 !BOC
 !-----------------------------------------------------------------------
 
-   call MPI_BARRIER(MPI_COMM_OCN, ierr)
+   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
    call MPI_ABORT(MPI_COMM_WORLD, ierr)
    call MPI_FINALIZE(ierr)
 
