@@ -24,13 +24,14 @@
 
 ! !PUBLIC TYPES:
 
-      integer (int_kind) :: &
+      integer (int_kind), public :: &
 	 iproc,	  &
 	 jproc,	  &
 	 iglobal, &
 	 jglobal, &
 	 nloc_x,  &
 	 nloc_y
+      integer (int_kind), dimension(:,:), allocatable, public :: dist
 
 
 ! !PUBLIC MEMBER FUNCTIONS:
@@ -53,6 +54,7 @@
 
 ! !INPUT PARAMETERS:
 
+   include 'mpif.h' ! MPI Fortran include file
 
    integer (int_kind), intent(in) :: &
 	nprocs,		&
@@ -61,27 +63,72 @@
 
     ! local parameter 
     integer (int_kind) :: &
-	i,	&
+	i,j,k,  ierr, 	&
 	tmpx,	&
-	tmpy	&
+	tmpy
 	
-      
-    do i = 0, nprocs
-	if my_task == i 
-	    iproc = i%nproc_x   
-	    jproc = i/nproc_x
-	    tmpx  = nglob_x/iproc
-	    tmpy  = nglob_y/jproc
-	    iglobal = iproc*tmpx
-	    jglobal = jproc*tmpy
-	    nloc_x  = max(nglob_x-iglobal,tmpx) 
-	    nloc_y  = max(nglob_y-jglobal,tmpy) 
-	end if 
-    end do 
+    !write(stdout,'(a6,i4, i4, i6, i6, i4, i4, i4 )') '1id',  &
+!	& my_task, iproc, jproc, iglobal, jglobal, nloc_x, nloc_y 
+    if (.not. allocated( dist) ) allocate(dist(0:nproc_x+1, 0:nproc_y+1))
+    dist(:,:) = MPI_PROC_NULL
+    call  MPI_BARRIER(comm, ierr)
     
+    tmpx  = nglob_x/nproc_x
+    tmpy  = (nglob_y-1)/nproc_y
 
+    do i = 0, nproc_x-1
+	do j = 0, nproc_y-1
+	    k = j*nproc_x+i
+	    dist(i+1, j+1) = k
+	   
+	   if (my_task == k ) then 
+	    iproc = i
+	    jproc = j
+	    iglobal = iproc*tmpx 
+	    jglobal = jproc*tmpy +1
+	    nloc_x  = tmpx
+	    !write(*,*)  my_task,  nglob_x -iglobal, tmpx, nloc_x
+	    if (jproc == nproc_y-1) then 
+		nloc_y  =nglob_y-jglobal-1
+	    else 
+		nloc_y = tmpy
+	    endif 
 
- subroutine  create_distribution
+	    end if 
+	end do 
+    end do 
+
+    do j = 1, nproc_y
+        dist(0, j) = dist(nproc_x,j)
+        dist(nproc_x+1, j) = dist(1,j)
+    end do 
+
+    !nloc_x = nloc_x !+ 1  ! grid range x ~ [1, nloc_x]
+    !nloc_y = nloc_y !+ 1	 ! grid range y ~ [1, nloc_y]
+    !if (my_task == master_task) then
+    !    !@write(*,*)	"======================================================="
+    !endif 
+    !do k = 0, nprocs
+    !    if (my_task == k ) then 
+    !     !    write(stdout,'(a4,i4, i4, i4, i6, i6, i4, i4 )') 'id2',  &
+    !     !        & my_task, iproc, jproc, iglobal, jglobal, nloc_x, nloc_y 
+    !         !do i = 0, nproc_x+1
+    !         !   write(*,*) dist(i,:)
+    !         !end do 
+    !     end if 
+    !         call  MPI_BARRIER(comm, ierr)
+    !end do 
+
+    end subroutine  create_distribution
+   
+
+    ! warning!!!!!  please call this sub somewhere 
+    subroutine  destroy_distribution 
+
+	if (allocated (dist)) deallocate (dist)
+    
+    end subroutine  destroy_distribution
+
 
 
 

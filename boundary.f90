@@ -36,9 +36,9 @@
 
    public :: create_boundary,  &
              destroy_boundary, &
-             update_ghost_cells
+             update_boundary
 
-   interface update_ghost_cells  ! generic interface
+   interface update_boundary  ! generic interface
       module procedure boundary_2d_dbl
    end interface
 
@@ -61,18 +61,18 @@ contains
 	if (dist(i,j)  == my_task) then
 	    e_proc = dist(i+1, j)
 	    w_proc = dist(i-1, j)
-	    n_proc = dist(i, j-1)
-	    s_proc = dist(i, j+1)
+	    n_proc = dist(i, j+1)
+	    s_proc = dist(i, j-1)
   
 	endif
 	end do 
    end do
-    do i = 0, nprocs 
-       if (my_task == i) then 
-	    write(*,*) 'neib ', i, e_proc, w_proc, n_proc, s_proc
-       end if 
-    call  MPI_BARRIER(comm, ierr)
-end do 
+    !do i = 0, nprocs 
+    !   if (my_task == i) then 
+    !        write(*,*) 'neib ', i, e_proc, w_proc, n_proc, s_proc
+    !   end if 
+    !call  MPI_BARRIER(comm, ierr)
+    !end do 
 
 
  end subroutine create_boundary
@@ -91,7 +91,7 @@ end do
 
 !***********************************************************************
 !BOP
-! !IROUTINE: update_ghost_cells
+! !IROUTINE: update_boundary
 ! !INTERFACE:
 
  subroutine boundary_2d_dbl(ARRAY)
@@ -144,23 +144,25 @@ end do
                      w_proc, 1, comm, rcv_request, ierr)
    
    if (e_proc /= MPI_PROC_NULL) then 
-   do  j = 1, nloc_y
-       buf_ew_snd(j)  = ARRAY(nloc_x, j)
-   end do 
+       do  j = 1, nloc_y
+	   buf_ew_snd(j)  = ARRAY(nloc_x, j)
+       end do 
    end if 
 
    call MPI_ISEND(buf_ew_snd(1), nloc_y, mpi_dbl, &
                      e_proc, 1, comm, snd_request, ierr)
 
    call MPI_WAIT(rcv_request, rcv_status, ierr)
+   
 
    if (w_proc /= MPI_PROC_NULL) then 
-   do  j = 1, nloc_y
-       ARRAY(0, j) = buf_ew_rcv(j)
-   end do 
+       do  j = 1, nloc_y
+	   ARRAY(0, j) = buf_ew_rcv(j)
+       end do 
    end if
 
    call MPI_WAIT(snd_request, snd_status, ierr)
+   call  MPI_BARRIER(comm, ierr)
 
    !==================send to west, rcv from east============
    buf_ew_rcv(:) = 0.
@@ -174,13 +176,13 @@ end do
    end if
 
    call MPI_ISEND(buf_ew_snd(1), nloc_y, mpi_dbl, &
-                     e_proc, 2, comm, snd_request, ierr)
+                     w_proc, 2, comm, snd_request, ierr)
 
    call MPI_WAIT(rcv_request, rcv_status, ierr)
 
    if (e_proc /= MPI_PROC_NULL) then 
    do  j = 1, nloc_y
-       ARRAY(nproc_x+1, j) = buf_ew_rcv(j)
+       ARRAY(nloc_x+1, j) = buf_ew_rcv(j)
    end do 
    end if 
 
@@ -188,6 +190,7 @@ end do
     
 
    deallocate(buf_ew_snd, buf_ew_rcv)
+   call  MPI_BARRIER(comm, ierr)
 
    !==================send to north, rcv from south ============
 
@@ -212,6 +215,7 @@ end do
    end if 
 
    call MPI_WAIT(snd_request, snd_status, ierr)
+   call  MPI_BARRIER(comm, ierr)
 
    !==================send to south, rcv from north ============
    buf_ns_rcv(:) = 0.
@@ -238,6 +242,7 @@ end do
    call MPI_WAIT(snd_request, snd_status, ierr)
 
    deallocate(buf_ns_snd, buf_ns_rcv)
+   call  MPI_BARRIER(comm, ierr)
 
 
  end subroutine boundary_2d_dbl

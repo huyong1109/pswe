@@ -18,7 +18,7 @@ SUBROUTINE cs
 !
 
    if (my_task == master_task) then
-	write(stdout,*) '===', detb,deta, nq
+	write(stdout,*) '===', detb,deta, nq, '==='
    end if 
    do j=0,nloc_y+1
 	  ai    = (j+jglobal)*deta-detb
@@ -50,9 +50,11 @@ SUBROUTINE cs
 	  f2(j)=ai/aj
    end do
 !
-   !if (my_task == master_task) then
-!	write(stdout,*) c1(:)
-   !end if 
+  ! if (my_task == 19) then
+  !      do j = 0,nloc_y+1
+  !          write(*,*) (j+jglobal),c1(j)
+  !      enddo
+  ! end if 
 
    do j=0,nloc_y+1
     
@@ -65,13 +67,13 @@ SUBROUTINE cs
 	  c14(j)=c12(j)*0.5
 	     !write(*,*)	my_task, "===========", j, "======="
    end do
-    do j = 0, nprocs
-	if (my_task == j ) then 
-	     write(*,*)	"===========", j, "======="
-   	     write(stdout,'(6f7.3)') c1(:)
-	 end if 
-	     call  MPI_BARRIER(comm, ierr)
-    end do 
+   ! do j = 0, nprocs
+   !     if (my_task == j ) then 
+   !          write(*,*)	"===========", j, "======="
+   !	     write(stdout,'(6f7.3)') c1(:)
+   !      end if 
+   !          call  MPI_BARRIER(comm, ierr)
+   ! end do 
 
 !
    return

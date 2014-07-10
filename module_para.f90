@@ -118,11 +118,13 @@ contains
    
 
    endif
-      
+   
+
    call broadcast_scalar(nml_error, master_task)
    if (nml_error /= 0) then
       call exit_PSWE(sigAbort,'ERROR reading pswe_in')
    endif
+
 
    call broadcast_scalar(nproc_x, master_task)
    call broadcast_scalar(nproc_y, master_task)
@@ -131,6 +133,9 @@ contains
    call broadcast_scalar(tlo, master_task)
    call broadcast_scalar(t0, master_task)
    call broadcast_scalar(t1, master_task)
+   if (nproc_x *nproc_y /= nprocs) then
+      call exit_PSWE(sigAbort,'ERROR computing resource')
+   endif
 
 !---------------------------------------------------------------------- !
 ! perform some basic checks on domain
