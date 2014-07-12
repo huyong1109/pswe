@@ -102,6 +102,7 @@ subroutine euler(dt,iter)
 	en=inner(tu,tv,th,tu,tv,th)
 	
 	den=dabs(en-en0)*2.0/(en+en0)
+	!if (my_task .eq. master_task ) write(*,*) k ,  en
 	en0=en
 	if (den.lt.1.0d-15) break_cir = 1
 	if (break_cir .eq. 1) goto 10
@@ -136,8 +137,8 @@ subroutine euler(dt,iter)
 
     real(r8),dimension(0:nloc_x+1,0:nloc_y+1), intent(in)    :: ra,rh
     real(r8),dimension(0:nloc_x+1,0:nloc_y+1), intent(inout)   :: th
-    real(r8),dimension(:), allocatable        :: fm,fp,f0,gm,gp,g0,rf,rg 
-    real(r8),dimension(:,:),allocatable	      ::  gra, grh, gth
+    real(r8),dimension(:,:), allocatable        :: fm,fp,f0,gm,gp,g0,rf,rg 
+    real(r8),dimension(:,:), allocatable	      ::  gra, grh, gth
 
     real(r8)                      :: ai,aj
 
@@ -146,14 +147,16 @@ subroutine euler(dt,iter)
         allocate(gth(1:nloc_x, 1:nloc_y*nproc_x))
         allocate(gra(1:nloc_x, 1:nloc_y*nproc_x))
         allocate(grh(1:nloc_x, 1:nloc_y*nproc_x))
-        allocate(fm(1:kn))
-        allocate(fp(1:kn))
-        allocate(f0(1:kn))
-        allocate(gm(1:kn))
-        allocate(gp(1:kn))
-        allocate(g0(1:kn))
-        allocate(rf(1:kn))
-        allocate(rg(1:kn))
+       
+	allocate(fm(1:kn,1:nloc_y))
+        allocate(fp(1:kn,1:nloc_y))
+
+        allocate(f0(1:kn,1:nloc_y))
+        allocate(gm(1:kn,1:nloc_y))
+        allocate(gp(1:kn,1:nloc_y))
+        allocate(g0(1:kn,1:nloc_y))
+        allocate(rf(1:kn,1:nloc_y))
+        allocate(rg(1:kn,1:nloc_y))
 
 
         gth(:,:) = 0.0
@@ -168,54 +171,47 @@ subroutine euler(dt,iter)
     if (iproc == 0 ) then
 
         do j = 1, nloc_y
-	    
-            fm(1:kn)= 0.0 
-            fp(1:kn)= 0.0 
-            f0(1:kn)= 0.0 
-            gm(1:kn)= 0.0 
-            gp(1:kn)= 0.0 
-            g0(1:kn)= 0.0 
-            rf(1:kn)= 0.0 
-            rg(1:kn)= 0.0 
             do i=1,kn
                 i1=i*2-1
                 i2=i1+1
 
-                fp(i)=-gra(mod(i2-1, nloc_x)+1, j+i1/nloc_x*nloc_y)
-                rf(i)=grh(mod(i1-1, nloc_x)+1,j+i1/nloc_x*nloc_y)
+                fp(i,j)=-gra(mod(i2-1, nloc_x)+1, j+i1/nloc_x*nloc_y)
+                rf(i,j)=grh(mod(i1-1, nloc_x)+1,j+i1/nloc_x*nloc_y)
 
-                gm(i)=-gra(mod(i1-1, nloc_x)+1,j+i1/nloc_x*nloc_y)
-                rg(i)=grh(mod(i2-1, nloc_x)+1, j+i1/nloc_x*nloc_y)
+                gm(i,j)=-gra(mod(i1-1, nloc_x)+1,j+i1/nloc_x*nloc_y)
+                rg(i,j)=grh(mod(i2-1, nloc_x)+1, j+i1/nloc_x*nloc_y)
             enddo
 
-            do i=2,kn
-                fm(i)=fp(i-1)
-            enddo
-            fm(1)=fp(kn)
+	    do i=2,kn
+		fm(i,j)=fp(i-1,j)
+	    enddo
+	    fm(1,j)=fp(kn,j)
 
-            do i=1,kn-1
-                gp(i)=gm(i+1)
-            enddo
-            gp(kn)=gm(1)
+	    do i=1,kn-1
+		gp(i,j)=gm(i+1,j)
+	    enddo
+	    gp(kn,j)=gm(1,j)
 
-            do i=1,kn
-                f0(i)=1.0-fm(i)-fp(i)
-                g0(i)=1.0-gm(i)-gp(i)
-            enddo
-
-            !	    solve two tri-diagonal linear system
-            call LU0(fm,f0,fp,rf,kn)
-            call LU0(gm,g0,gp,rg,kn)
+	    do i=1,kn
+		f0(i,j)=1.0-fm(i,j)-fp(i,j)
+		g0(i,j)=1.0-gm(i,j)-gp(i,j)
+	    enddo
+	enddo
 
 
-            do i=1,kn
-                i1=i*2-1
-                i2=i1+1
+	    call LU(fm(:,:),f0(:,:),fp(:,:),rf(:,:),nloc_y, kn)
+	    call LU(gm(:,:),g0(:,:),gp(:,:),rg(:,:),nloc_y, kn)
 
-                gth(mod(i1-1, nloc_x)+1,j+i1/nloc_x*nloc_y)=rf(i)
-                gth(mod(i2-1, nloc_x)+1, j+i1/nloc_x*nloc_y)=rg(i)
-            enddo
-        enddo
+
+	do j=1,nloc_y
+	    do i=1,kn
+		i1=i*2-1
+		i2=i1+1
+
+		gth(mod(i1-1, nloc_x)+1,j+i1/nloc_x*nloc_y)=rf(i,j)
+		gth(mod(i2-1, nloc_x)+1, j+i1/nloc_x*nloc_y)=rg(i,j)
+	    enddo
+	enddo
 
 
     endif
@@ -236,6 +232,62 @@ subroutine euler(dt,iter)
     endif 
  
  end subroutine Tri_diag
+ subroutine LU(a,b,c,r,m,n)
+    !Gauss elimination method/Chasing method  with periodic boundary
+    ! on Wang's book P159
+    use kinds_mod
+    implicit none
+    !
+    integer                 :: i,j, n, m
+    real(r8) ,dimension(1:m)     :: sn,rn
+    real(r8)		         :: ai
+    !
+    real(r8),dimension(1:n, 1:m) :: a,b,c,r
+    real(r8),dimension(1:n, 1:m) :: s,t
+    !
+    s(1, 1:m)=a(1, 1:m)  ! s = \tilde(a)
+    t(1, 1:m)=c(n, 1:m)  ! t = \tilde(c)
+    !
+    sn(:)=0.0	   ! \tilde(b)_N
+    rn(:)=0.0	   ! \tilde(r)_N
+    
+    do j = 1, m
+	do i=2,n-1
+	    ai=a(i, j)/b(i-1, j)
+	    b(i, j)=b(i, j)-ai*c(i-1,j)
+	    r(i, j)=r(i, j)-ai*r(i-1,j)
+	    s(i, j)=-ai*s(i-1, j)
+	    !
+	    ai=t(i-1, j)/b(i-1, j)
+	    t(i, j)=-ai*c(i-1, j)
+	    sn(j)  =sn(j)-ai*s(i-1, j)
+	    rn(j)  =rn(j)-ai*r(i-1, j)
+	enddo
+    enddo
+    
+    
+    do j = 1, m
+	a(n, j)=a(n, j)+t(n-1, j)
+    	b(n, j)=b(n, j)+sn(j)
+    	c(n-1, j)=c(n-1, j)+s(n-1, j)
+    	r(n, j)=r(n, j)+rn(j)
+
+	ai=a(n, j)/b(n-1, j)
+    	b(n, j)=b(n, j)-ai*c(n-1, j)
+    	r(n, j)=r(n, j)-ai*r(n-1, j)
+    	!
+    	r(n, j)=r(n, j)/b(n, j)
+    	r(n-1, j)=(r(n-1, j)-c(n-1, j)*r(n, j))/b(n-1, j)
+
+	do i=n-2,1,-1
+	    ai=r(i, j)-s(i, j)*r(n, j)-c(i, j)*r(i+1, j)
+	    r(i, j)=ai/b(i, j)
+	enddo
+    enddo 
+
+    return
+    
+ end subroutine LU
     
  subroutine LU0(a,b,c,r,n)
     !Gauss elimination method/Chasing method  with periodic boundary
