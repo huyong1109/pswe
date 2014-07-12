@@ -74,8 +74,6 @@
     call update_boundary(wh)
     call update_boundary(u)
     call update_boundary(v)
-    !write(*,*) wh
-    !call mpi_print(v)
     !
     call master_print_message('Finish Haurwitz')
     return

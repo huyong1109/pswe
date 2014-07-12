@@ -1,10 +1,16 @@
-FC= mpiifort
+FC= mpiifort 
 CPP = /usr/bin/cpp 
-SRC= kinds_mod.f90 communicate.f90  pswe.f90
+SRC= kinds_mod.f90 communicate.f90  \
+     exit_mod.f90 broadcast.f90\
+     module_para.f90 distribution.f90 \
+     module_array.f90 global_reductions.f90 \
+     boundary.f90 module_io.f90\
+     cs.f90 haurwitz.f90 \
+     dif.f90 euler.f90 \
+     pswe.f90 
 OBJS= $(SRC:.f90=.o) 
 EXE=PSWE
 
-#module_array.f90 cs.f90 dif.f90 euler.f90 haurwitz.f90 main.f90
 
 all : $(SRC) $(EXE)
 
@@ -13,13 +19,11 @@ $(EXE): $(OBJS)
 
 
 #.SUFFIXES : .f90
-.f90.o:
-	$(FC) $<  -c $@
-	#####> $*.f90 ; $(FC) -c $*.F90 ; mv $*.F90 $*.i
+%.o: %.f90
+	$(FC) -c -g -traceback   $<
  
 
 clean:
 	rm -f *.o *.mod  $(EXE)
 run:
-	make 
-	./$(EXE)
+	mpirun -np 20 ./$(EXE)

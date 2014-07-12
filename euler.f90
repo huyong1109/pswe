@@ -36,12 +36,10 @@ subroutine euler(dt,iter)
 
     !	Initial energy
     en0=inner(wu,wv,wh,wu,wv,wh)
-    call master_print_message(en0, 'en0')
 
     !	Iterate until convergence ( |E-E0| < 1.0E-15 E0 )
     break_cir = 0
     do k=1,1000
-	call master_print_message(k,'iter')
 
 	do j=0,nloc_y+1
 	    do i=0,nloc_x+1
@@ -183,11 +181,6 @@ subroutine euler(dt,iter)
                 i1=i*2-1
                 i2=i1+1
 
-                !fp(i)=-gra(i2*(j/nloc_x), MOD(j,nloc_x))
-                !rf(i)=grh(i1*(j/nloc_x),MOD(j,nloc_x))
-                !gm(i)=-gra(i1*(j/nloc_x),MOD(j,nloc_x))
-                !rg(i)=grh(i2*(j/nloc_x),MOD(j,nloc_x))
-		!write(*,*) my_task, mod(i2-1, nloc_x)+1, j+i1/nloc_x*nloc_y
                 fp(i)=-gra(mod(i2-1, nloc_x)+1, j+i1/nloc_x*nloc_y)
                 rf(i)=grh(mod(i1-1, nloc_x)+1,j+i1/nloc_x*nloc_y)
 

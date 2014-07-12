@@ -36,7 +36,9 @@
 
    public :: create_boundary,  &
              destroy_boundary, &
-             update_boundary
+             update_boundary, &
+	     update_latitude, &
+	     update_neigbor 
 
    interface update_boundary  ! generic interface
       module procedure boundary_2d_dbl
@@ -67,12 +69,6 @@ contains
 	endif
 	end do 
    end do
-    !do i = 0, nprocs 
-    !   if (my_task == i) then 
-    !        write(*,*) 'neib ', i, e_proc, w_proc, n_proc, s_proc
-    !   end if 
-    !call  MPI_BARRIER(comm, ierr)
-    !end do 
 
 
  end subroutine create_boundary
@@ -162,7 +158,6 @@ contains
    end if
 
    call MPI_WAIT(snd_request, snd_status, ierr)
-   call  MPI_BARRIER(comm, ierr)
 
    !==================send to west, rcv from east============
    buf_ew_rcv(:) = 0.
@@ -190,7 +185,6 @@ contains
     
 
    deallocate(buf_ew_snd, buf_ew_rcv)
-   call  MPI_BARRIER(comm, ierr)
 
    !==================send to north, rcv from south ============
 
@@ -215,7 +209,6 @@ contains
    end if 
 
    call MPI_WAIT(snd_request, snd_status, ierr)
-   call  MPI_BARRIER(comm, ierr)
 
    !==================send to south, rcv from north ============
    buf_ns_rcv(:) = 0.
@@ -242,11 +235,112 @@ contains
    call MPI_WAIT(snd_request, snd_status, ierr)
 
    deallocate(buf_ns_snd, buf_ns_rcv)
-   call  MPI_BARRIER(comm, ierr)
 
 
  end subroutine boundary_2d_dbl
 
+ subroutine  update_latitude(ARRAY)
+   include 'mpif.h'   ! MPI Fortran include file
+
+! !INPUT PARAMETERS:
+   real (r8), dimension(0:nloc_x+1,0:nloc_y+1), intent(inout) :: &
+      ARRAY              ! array containing horizontal slab to update
+
+!-----------------------------------------------------------------------
+!
+!  local variables
+!
+!-----------------------------------------------------------------------
+
+   integer (int_kind) ::           &
+      i,j,    	                   &! dummy loop indices
+      ierr                          ! MPI error flag
+
+   integer (int_kind) ::	&
+      snd_request,              &! MPI request ids
+      rcv_request                ! MPI request ids
+
+   integer (int_kind) :: &
+      snd_status,               &! MPI status flags
+      rcv_status                 ! MPI status flags
+
+   real (r8), dimension(:), allocatable :: &
+      buf_ew_snd,       &! message buffer for east-west sends
+      buf_ew_rcv,       &! message buffer for east-west recvs
+      buf_ns_snd,       &! message buffer for north-south sends
+      buf_ns_rcv         ! message buffer for north-south recvs
+
+
+!-----------------------------------------------------------------------
+!
+!  allocate buffers for east-west sends and receives
+!
+!-----------------------------------------------------------------------
+   !call timer_start(bndy_2d_recv)
+   allocate (buf_ew_snd(1:nloc_y), &
+	     buf_ew_rcv(1:nloc_y), &
+	     buf_ns_snd(1:nloc_x), &
+	     buf_ns_rcv(1:nloc_x))
+	     
+   !==================send to east, rcv from west ============
+
+   call MPI_IRECV(buf_ew_rcv(1), nloc_y, mpi_dbl,   &
+                     w_proc, 1, comm, rcv_request, ierr)
+   
+   if (e_proc /= MPI_PROC_NULL) then 
+       do  j = 1, nloc_y
+	   buf_ew_snd(j)  = ARRAY(nloc_x, j)
+       end do 
+   end if 
+
+   call MPI_ISEND(buf_ew_snd(1), nloc_y, mpi_dbl, &
+                     e_proc, 1, comm, snd_request, ierr)
+
+   call MPI_WAIT(rcv_request, rcv_status, ierr)
+   
+
+   if (w_proc /= MPI_PROC_NULL) then 
+       do  j = 1, nloc_y
+	   ARRAY(0, j) = buf_ew_rcv(j)
+       end do 
+   end if
+
+   call MPI_WAIT(snd_request, snd_status, ierr)
+
+   !==================send to west, rcv from east============
+   buf_ew_rcv(:) = 0.
+   call MPI_IRECV(buf_ew_rcv(1), nloc_y, mpi_dbl,   &
+                     e_proc, 2, comm, rcv_request, ierr)
+
+   if (w_proc /= MPI_PROC_NULL) then 
+   do  j = 1, nloc_y
+       buf_ew_snd(j)  = ARRAY(1, j)
+   end do 
+   end if
+
+   call MPI_ISEND(buf_ew_snd(1), nloc_y, mpi_dbl, &
+                     w_proc, 2, comm, snd_request, ierr)
+
+   call MPI_WAIT(rcv_request, rcv_status, ierr)
+
+   if (e_proc /= MPI_PROC_NULL) then 
+   do  j = 1, nloc_y
+       ARRAY(nloc_x+1, j) = buf_ew_rcv(j)
+   end do 
+   end if 
+
+   call MPI_WAIT(snd_request, snd_status, ierr)
+    
+
+   deallocate(buf_ew_snd, buf_ew_rcv)
+
+
+ end subroutine update_latitude
+ 
+ subroutine  update_neigbor 
+ 
+
+ end subroutine update_neigbor
 
 end module boundary
 

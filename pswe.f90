@@ -118,11 +118,11 @@ program PSWE
 	end if
 	nw=nw+1
 	
-	!if (my_task.eq. 0 .and. nt.eq.23) then
+	if (my_task == master_task .and. nt.eq.23) then
 	    print *,'-------------------------------------------------------------------------------'
 	    print *,'       The Energy           The Total-Mass        The iteration number'
 	    nt=1
-	!end if
+	end if
 	!------------------------------------------------
 	!       The time integration
 	!------------------------------------------------
@@ -135,23 +135,26 @@ program PSWE
 		v(i,j)=wv(i,j)/ai
 	    end do
 	end do
-!	if ((nyn.eq.1).or.(int(tt/43200)*43200.eq.tt)) then
+
+	if ((nyn.eq.1).or.(int(tt/43200)*43200.eq.tt)) then
 
 	    tener=inner(wu,wv,wh,wu,wv,wh)
 
 	    tmass = mass(wh)
 
-!	    if (my_task.eq.0 .and. nyn.eq.0) then
+	    if (my_task.eq.0 .and. nyn.eq.0) then
 		print *,'       (The integral time is      ',tt,')'
 		nt=nt+1
 		print *,tener,tmass,iter
-		nt=nt+1
-!	    endif
-!	end if
+	    endif 
+
+	    nt=nt+1
+	endif
     end do
 
 
     !!!!!!!!!!!!!!!!!!!!!!! Finallize  !!!!!!!!!!!!!!!!!!!!!!
+    call master_print_message(0, 'The main part of this program has ended')
     call  destroy_array
     call  MPI_BARRIER(comm, ierr)
     
