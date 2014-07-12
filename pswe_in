@@ -1,14 +1,14 @@
 &dist_nml
-  nproc_x = 2
-  nproc_y = 2
+  nproc_x = 4
+  nproc_y = 5
 /
 
 &domain_nml
-  p = 720
-  q = 360
+  p = 80
+  q = 40
 /
 &time_manager_nml
-  tlo = 200
+  tlo = 1200
   t0 = 0
   t1 = 8640000
 /
