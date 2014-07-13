@@ -123,113 +123,94 @@ subroutine euler(dt,iter)
  end subroutine euler
 
  subroutine Tri_diag(ra, rh, th )
-    use kinds_mod, only: r8
+    use kinds_mod, only: r8, int_kind
     use distribution, only: nloc_x, nloc_y, jproc, iproc
-    use module_para, only: nproc_x, kn
+    use module_para, only: nproc_x
+    use communicate
     use module_io, only: check_nan
-    use boundary, only: update_boundary
+    use boundary , only: update_boundary, e_proc, w_proc
     use global_reductions, only:  lat_gather, lat_scatter
+    use mpi
 
 
     implicit none
 
-    integer i,i1,i2,j,k,iter,ierr
+    integer i,i1,i2,j,k,hn,iter,ierr
 
     real(r8),dimension(0:nloc_x+1,0:nloc_y+1), intent(in)    :: ra,rh
     real(r8),dimension(0:nloc_x+1,0:nloc_y+1), intent(inout)   :: th
-    real(r8),dimension(:,:), allocatable        :: fm,fp,f0,gm,gp,g0,rf,rg 
-    real(r8),dimension(:,:), allocatable	      ::  gra, grh, gth
-
+    real(r8),dimension(1:nloc_x/2,1:nloc_y)	   :: fm,fp,f0,gm,gp,g0,rf,rg 
+    real(r8),dimension(1:nloc_y) :: sendbuf,recvbuf 
+    integer(int_kind) :: snd_req,rcv_req
+    integer:: stat(MPI_STATUS_SIZE)
     real(r8)                      :: ai,aj
 
-
-    if (iproc == 0 ) then
-        allocate(gth(1:nloc_x, 1:nloc_y*nproc_x))
-        allocate(gra(1:nloc_x, 1:nloc_y*nproc_x))
-        allocate(grh(1:nloc_x, 1:nloc_y*nproc_x))
-       
-	allocate(fm(1:kn,1:nloc_y))
-        allocate(fp(1:kn,1:nloc_y))
-
-        allocate(f0(1:kn,1:nloc_y))
-        allocate(gm(1:kn,1:nloc_y))
-        allocate(gp(1:kn,1:nloc_y))
-        allocate(g0(1:kn,1:nloc_y))
-        allocate(rf(1:kn,1:nloc_y))
-        allocate(rg(1:kn,1:nloc_y))
-
-
-        gth(:,:) = 0.0
-        gra(:,:) = 0.0
-        grh(:,:) = 0.0
-    endif 
-
-    call lat_gather(gra, ra)
-    call lat_gather(grh, rh)
+    hn = nloc_x/2
 
     !	grid divided into two groups. 
-    if (iproc == 0 ) then
+    do j = 1, nloc_y
+	do i=1,hn
+	    i1=i*2-1
+	    i2=i1+1
 
-        do j = 1, nloc_y
-            do i=1,kn
-                i1=i*2-1
-                i2=i1+1
+	    fp(i,j) = -ra(i2,j)
+	    rf(i,j) = rh(i1,j)
 
-                fp(i,j)=-gra(mod(i2-1, nloc_x)+1, j+i1/nloc_x*nloc_y)
-                rf(i,j)=grh(mod(i1-1, nloc_x)+1,j+i1/nloc_x*nloc_y)
-
-                gm(i,j)=-gra(mod(i1-1, nloc_x)+1,j+i1/nloc_x*nloc_y)
-                rg(i,j)=grh(mod(i2-1, nloc_x)+1, j+i1/nloc_x*nloc_y)
-            enddo
-
-	    do i=2,kn
-		fm(i,j)=fp(i-1,j)
-	    enddo
-	    fm(1,j)=fp(kn,j)
-
-	    do i=1,kn-1
-		gp(i,j)=gm(i+1,j)
-	    enddo
-	    gp(kn,j)=gm(1,j)
-
-	    do i=1,kn
-		f0(i,j)=1.0-fm(i,j)-fp(i,j)
-		g0(i,j)=1.0-gm(i,j)-gp(i,j)
-	    enddo
+	    gm(i,j) = -ra(i1,j)
+	    rg(i,j) = rh(i2,j)
 	enddo
+    enddo 
 
 
-	    call LU(fm(:,:),f0(:,:),fp(:,:),rf(:,:),nloc_y, kn)
-	    call LU(gm(:,:),g0(:,:),gp(:,:),rg(:,:),nloc_y, kn)
+ do j = 1,nloc_y
+      sendbuf(j) = fp(hn,j)
+ enddo
+    call MPI_ISEND(sendbuf(1),nloc_y,MPI_DBL,e_proc,1,comm,snd_req,ierr)
+    call MPI_IRECV(recvbuf(1),nloc_y,MPI_DBL,w_proc,1,comm,rcv_req,ierr)
+    call MPI_WAIT(rcv_req,stat,ierr)
+ do j =1,nloc_y 
+    do i=2,hn
+       fm(i,j)=fp(i-1,j)
+    enddo
+       fm(1,j)=recvbuf(j)
+ enddo
+
+ do j = 1,nloc_y
+      sendbuf(j) = gm(1,j)
+ enddo
+    call MPI_ISEND(sendbuf(1),nloc_y,MPI_DBL,w_proc,2,comm,snd_req,ierr)
+    call MPI_IRECV(recvbuf(1),nloc_y,MPI_DBL,e_proc,2,comm,rcv_req,ierr)
+    call MPI_WAIT(rcv_req,stat,ierr)
+ do j =1,nloc_y 
+    do i=1,hn-1
+	gp(i,j)=gm(i+1,j)
+    enddo
+	gp(hn,j)=recvbuf(j)
+ enddo
 
 
-	do j=1,nloc_y
-	    do i=1,kn
-		i1=i*2-1
-		i2=i1+1
-
-		gth(mod(i1-1, nloc_x)+1,j+i1/nloc_x*nloc_y)=rf(i,j)
-		gth(mod(i2-1, nloc_x)+1, j+i1/nloc_x*nloc_y)=rg(i,j)
-	    enddo
+    do j =1,nloc_y 
+	do i=1,hn
+	    f0(i,j)=1.0-fm(i,j)-fp(i,j)
+	    g0(i,j)=1.0-gm(i,j)-gp(i,j)
 	enddo
+    enddo
 
 
-    endif
+    call tridiagnol_solver5(f0(:,:),fm(:,:),fp(:,:),rf(:,:), hn, nloc_y, nproc_x)
+    call tridiagnol_solver5(g0(:,:),gm(:,:),gp(:,:),rg(:,:), hn, nloc_y, nproc_x)
 
-    call lat_scatter(gth, th)	
-    if (iproc == 0 ) then
-        deallocate(fm)
-        deallocate(fp)
-        deallocate(f0)
-        deallocate(gm)
-        deallocate(gp)
-        deallocate(g0)
-        deallocate(rf)
-        deallocate(rg)
-        deallocate(gth)
-        deallocate(gra)
-        deallocate(grh)
-    endif 
+    
+    do j=1,nloc_y
+	do i=1,hn
+	    i1=i*2-1
+	    i2=i1+1
+
+	    th(i1,j)=rf(i,j)
+	    th(i2,j)=rg(i,j)
+ 	!@if(my_task .eq. 0) write(*,*) i1,j,th(i1,j)
+	enddo
+    enddo
  
  end subroutine Tri_diag
  subroutine LU(a,b,c,r,m,n)
@@ -339,5 +320,224 @@ subroutine euler(dt,iter)
     return
     !
  end subroutine LU0
+
+
+! 1, the equation should be like:
+!
+!	     |b c     a| 
+!  	     |a b c    |
+!  	     |  a b c  | * x = r
+!  	     |    a b c|
+!  	     |c     a b|
+subroutine tridiagnol_solver5(b,a,c,r,LN,M,np)
+    use communicate
+    implicit none
+    include 'mpif.h'
+
+    integer :: i,j
+    integer :: rank,np,err ! MPI parameters
+    integer :: p_down,p_up ! neighbor process number
+    integer :: LN,M        
+    integer :: stat(MPI_STATUS_SIZE)
+    real(8) :: a(LN,M),b(LN,M),c(LN,M),r(LN,M)
+    real(8) :: f(LN,M),g(LN,M) ! Wang's method parameters
+    real(8) :: mc(M)
+
+    real(8) :: sendbuf(M,8),recvbuf(M,8,np)
+    real(8) :: sendbuf2(M,2*np),recvbuf2(M,2)
+    real(8), dimension(2*np,M):: ga,gb,gc,gr ! extract equation
+
+    call MPI_COMM_RANK(comm_group,rank,err)
+    !call MPI_COMM_SIZE(comm_group,np,err)
+
+    f(1,:)=a(1,:)
+    f(2,:)=a(2,:)
+    do i=3,LN
+	mc     = a(i,:)/b(i-1,:)
+	f(i,:) = -f(i-1,:)*mc
+	b(i,:) = b(i,:) - c(i-1,:)*mc
+	r(i,:) = r(i,:) - r(i-1,:)*mc
+    enddo ! prove
+
+    g(LN,:)=c(LN,:)
+    g(LN-1,:)=c(LN-1,:)
+    do i=LN-2,2,-1
+	mc     = c(i,:)/b(i+1,:)
+	g(i,:) = -g(i+1,:)*mc
+	f(i,:) = f(i,:) - f(i+1,:)*mc
+	r(i,:) = r(i,:) - r(i+1,:)*mc
+    enddo
+    mc = c(1,:)/b(2,:)
+    g(1,:) = -g(2,:)*mc
+    b(1,:) = b(1,:) - f(2,:)*mc
+    r(1,:) = r(1,:) - r(2,:)*mc
+    
+    sendbuf(:,1)=f(1,:)
+    sendbuf(:,2)=b(1,:)
+    sendbuf(:,3)=g(1,:)
+    sendbuf(:,4)=r(1,:)
+    sendbuf(:,5)=f(LN,:)
+    sendbuf(:,6)=b(LN,:)
+    sendbuf(:,7)=g(LN,:)
+    sendbuf(:,8)=r(LN,:)
+    !if (rank==0) then
+    ! print *, "rank",rank,"M",M,"np",np
+    ! print *, "====="
+    ! print *, sendbuf
+    ! print *, "-----"
+    ! print *, recvbuf
+    !endif
+    call MPI_GATHER(sendbuf,8*M,MPI_DOUBLE_PRECISION,recvbuf,8*M,MPI_DOUBLE_PRECISION,np-1,comm_group,err)
+    if(rank==np-1)then
+	do i=1,np
+	    ! f>a b>b g>c r>r
+	    j=2*(i-1)+1
+	    ga(j,:)=recvbuf(:,1,i)
+	    gb(j,:)=recvbuf(:,2,i)
+	    gc(j,:)=recvbuf(:,3,i)
+	    gr(j,:)=recvbuf(:,4,i)
+	    j=j+1
+	    ga(j,:)=recvbuf(:,5,i)
+	    gb(j,:)=recvbuf(:,6,i)
+	    gc(j,:)=recvbuf(:,7,i)
+	    gr(j,:)=recvbuf(:,8,i)
+	enddo
+	!subroutine LU(a,b,c,r,m,n)
+	call LU(ga,gb,gc,gr,M,2*np)
+	do i=1,2*np
+	    sendbuf2(:,i)=gr(i,:)
+	enddo
+    endif
+    
+    call MPI_SCATTER(sendbuf2,2*M,MPI_DOUBLE_PRECISION,recvbuf2,2*M,MPI_DOUBLE_PRECISION,np-1,comm_group,err)
+    r(1,:)=recvbuf2(:,1)
+    r(LN,:)=recvbuf2(:,2)
+
+    do i=2,LN-1
+	r(i,:)=(r(i,:)-g(i,:)*r(LN,:)-f(i,:)*r(1,:))/b(i,:)
+    enddo
+
+    return
+end subroutine
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

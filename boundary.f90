@@ -25,7 +25,7 @@
 
 ! !PUBLIC TYPES:
 
-   integer (int_kind) :: &
+   integer (int_kind), public :: &
        e_proc        ,&! dest   proc for east-west send message
        w_proc        ,&! source proc for east-west recv message
        n_proc        ,&! dest   proc for north-south send message
