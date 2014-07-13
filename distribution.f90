@@ -54,7 +54,8 @@
 
 ! !INPUT PARAMETERS:
 
-   include 'mpif.h' ! MPI Fortran include file
+   !include 'mpif.h' ! MPI Fortran include file
+   use mpi
 
    integer (int_kind), intent(in) :: &
 	nprocs,		&

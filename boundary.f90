@@ -239,12 +239,13 @@ contains
 
  end subroutine boundary_2d_dbl
 
- subroutine  update_latitude(ARRAY)
+ subroutine  update_latitude(ARRAY1,ARRAY2)
+ ! used only in tri-diagonal solver
    include 'mpif.h'   ! MPI Fortran include file
 
 ! !INPUT PARAMETERS:
-   real (r8), dimension(0:nloc_x+1,0:nloc_y+1), intent(inout) :: &
-      ARRAY              ! array containing horizontal slab to update
+   real (r8), dimension(1:nloc_x/2,1:nloc_y), intent(inout) :: &
+      ARRAY1, ARRAY2              ! array containing horizontal slab to update
 
 !-----------------------------------------------------------------------
 !
@@ -266,9 +267,7 @@ contains
 
    real (r8), dimension(:), allocatable :: &
       buf_ew_snd,       &! message buffer for east-west sends
-      buf_ew_rcv,       &! message buffer for east-west recvs
-      buf_ns_snd,       &! message buffer for north-south sends
-      buf_ns_rcv         ! message buffer for north-south recvs
+      buf_ew_rcv         ! message buffer for east-west recvs
 
 
 !-----------------------------------------------------------------------
@@ -278,9 +277,7 @@ contains
 !-----------------------------------------------------------------------
    !call timer_start(bndy_2d_recv)
    allocate (buf_ew_snd(1:nloc_y), &
-	     buf_ew_rcv(1:nloc_y), &
-	     buf_ns_snd(1:nloc_x), &
-	     buf_ns_rcv(1:nloc_x))
+	     buf_ew_rcv(1:nloc_y))
 	     
    !==================send to east, rcv from west ============
 
@@ -289,7 +286,7 @@ contains
    
    if (e_proc /= MPI_PROC_NULL) then 
        do  j = 1, nloc_y
-	   buf_ew_snd(j)  = ARRAY(nloc_x, j)
+	   buf_ew_snd(j)  = ARRAY1(1, j)
        end do 
    end if 
 
@@ -301,7 +298,7 @@ contains
 
    if (w_proc /= MPI_PROC_NULL) then 
        do  j = 1, nloc_y
-	   ARRAY(0, j) = buf_ew_rcv(j)
+	   ARRAY1(1, j) = buf_ew_rcv(j)
        end do 
    end if
 
@@ -314,7 +311,7 @@ contains
 
    if (w_proc /= MPI_PROC_NULL) then 
    do  j = 1, nloc_y
-       buf_ew_snd(j)  = ARRAY(1, j)
+       buf_ew_snd(j)  = ARRAY2(nloc_x/2, j)
    end do 
    end if
 
@@ -325,7 +322,7 @@ contains
 
    if (e_proc /= MPI_PROC_NULL) then 
    do  j = 1, nloc_y
-       ARRAY(nloc_x+1, j) = buf_ew_rcv(j)
+       ARRAY2(nloc_x/2, j) = buf_ew_rcv(j)
    end do 
    end if 
 

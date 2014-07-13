@@ -5,7 +5,9 @@ module module_io
 contains
     
     subroutine mpi_print(mat)
-	include 'mpif.h'
+
+	use mpi
+	!include 'mpif.h'
 	integer :: i,j,ierr
 	real*8 :: mat(0:nloc_x+1,0:nloc_y+1)
 	character(len=5) :: s1,s2

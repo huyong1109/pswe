@@ -72,6 +72,8 @@ contains
     deallocate(c2 )
     deallocate(c11)
     deallocate(c12)
+    deallocate(c13)
+    deallocate(c14)
     deallocate(f1 )
     deallocate(f2 )
 

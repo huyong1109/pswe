@@ -14,6 +14,7 @@ program PSWE
     use global_reductions
     use boundary
     use module_io
+    use mpi, only: MPI_WTIME
 
     implicit none 
     ! local 
@@ -23,6 +24,7 @@ program PSWE
     
     real(r8) :: tener,tener0	! total energy at tn and t0, respectively
     real(r8) :: tmass,tmass0	! total mass at tn and t0, respectively
+    real(r8) :: mpi_time_start, mpi_time_end
 !																  !
     real(r8), dimension(:,:), allocatable :: pu,pv,ph                       ! for GrADS saving
 !																  !
@@ -34,6 +36,7 @@ program PSWE
     real(r8), external            :: inner, mass						  ! a external function to calculate inner product
 !
     call  init_communicate
+    mpi_time_start = MPI_WTIME()
     call  master_print_message("Init Parameter")
     call  init_para
     call  master_print_message("Init Array")
@@ -72,8 +75,6 @@ program PSWE
 	end if
     end if
    
-    
-    
     
     call  master_print_message("Compute parameters")
     call  cs  
@@ -154,10 +155,10 @@ program PSWE
 
 
     !!!!!!!!!!!!!!!!!!!!!!! Finallize  !!!!!!!!!!!!!!!!!!!!!!
-    call master_print_message(0, 'The main part of this program has ended')
-    call  destroy_array
-    call  MPI_BARRIER(comm, ierr)
-    
+    call destroy_array
+    mpi_time_end = MPI_WTIME()
+    call master_print_message(mpi_time_end - mpi_time_start, "RUNTIME :")
+    call exit_PSWE(0, "The main part of this program has ended!") 
 end program PSWE
 
 

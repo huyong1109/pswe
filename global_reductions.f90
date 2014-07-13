@@ -67,7 +67,8 @@
  function global_sum_dbl(X)
 
 
-   include 'mpif.h'  ! MPI Fortran include file
+   use mpi
+   !include 'mpif.h'  ! MPI Fortran include file
 
 ! !INPUT PARAMETERS:
 
@@ -115,7 +116,8 @@
  subroutine polar_sum(X, polar_sum_s, polar_sum_n)
 
 
-   include 'mpif.h'  ! MPI Fortran include file
+   use mpi
+   !include 'mpif.h'  ! MPI Fortran include file
 
 ! !INPUT PARAMETERS:
 
@@ -163,7 +165,8 @@
  subroutine lat_gather(X, Y)
 
 
-   include 'mpif.h'  ! MPI Fortran include file
+   use mpi
+   !include 'mpif.h'  ! MPI Fortran include file
 
 ! !INPUT PARAMETERS:
 
@@ -186,7 +189,8 @@
  subroutine lat_scatter(X, Y)
 
 
-   include 'mpif.h'  ! MPI Fortran include file
+   use mpi
+   !include 'mpif.h'  ! MPI Fortran include file
 
 ! !INPUT PARAMETERS:
 
@@ -218,7 +222,8 @@
 !
 !-----------------------------------------------------------------------
 
-   include 'mpif.h'  ! MPI Fortran include file
+   use mpi
+   !include 'mpif.h'  ! MPI Fortran include file
 
    real (r8), intent(inout) :: &
       local_scalar                ! local scalar to be compared

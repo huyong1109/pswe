@@ -5,7 +5,7 @@ subroutine euler(dt,iter)
     use communicate, only:master_print_message
     use module_array, only: wu, wv, wh, c11
     use module_io
-    use boundary, only: update_boundary
+    use boundary, only: update_boundary, update_latitude
     use global_reductions, only: global_sum
 
     implicit none
@@ -128,7 +128,7 @@ subroutine euler(dt,iter)
     use module_para, only: nproc_x
     use communicate
     use module_io, only: check_nan
-    use boundary , only: update_boundary, e_proc, w_proc
+    use boundary , only: update_boundary, update_latitude, e_proc, w_proc
     use global_reductions, only:  lat_gather, lat_scatter
     use mpi
 
@@ -162,32 +162,21 @@ subroutine euler(dt,iter)
     enddo 
 
 
- do j = 1,nloc_y
-      sendbuf(j) = fp(hn,j)
- enddo
-    call MPI_ISEND(sendbuf(1),nloc_y,MPI_DBL,e_proc,1,comm,snd_req,ierr)
-    call MPI_IRECV(recvbuf(1),nloc_y,MPI_DBL,w_proc,1,comm,rcv_req,ierr)
-    call MPI_WAIT(rcv_req,stat,ierr)
  do j =1,nloc_y 
-    do i=2,hn
+    do i=2,hn-1
        fm(i,j)=fp(i-1,j)
+       gp(i,j)=gm(i+1,j)
     enddo
-       fm(1,j)=recvbuf(j)
  enddo
 
- do j = 1,nloc_y
-      sendbuf(j) = gm(1,j)
- enddo
-    call MPI_ISEND(sendbuf(1),nloc_y,MPI_DBL,w_proc,2,comm,snd_req,ierr)
-    call MPI_IRECV(recvbuf(1),nloc_y,MPI_DBL,e_proc,2,comm,rcv_req,ierr)
-    call MPI_WAIT(rcv_req,stat,ierr)
  do j =1,nloc_y 
-    do i=1,hn-1
-	gp(i,j)=gm(i+1,j)
-    enddo
-	gp(hn,j)=recvbuf(j)
+       fm(hn,j)=fp(hn-1,j)
+       fm(1,j)=fp(hn,j)
+       gp(1,j)=gm(2,j)
+       gp(hn,j)=gm(1,j)
  enddo
 
+ call update_latitude(fm, gp)
 
     do j =1,nloc_y 
 	do i=1,hn
@@ -208,11 +197,12 @@ subroutine euler(dt,iter)
 
 	    th(i1,j)=rf(i,j)
 	    th(i2,j)=rg(i,j)
- 	!@if(my_task .eq. 0) write(*,*) i1,j,th(i1,j)
+ 	!if(my_task .eq. 0) write(*,*) i1,j,th(i1,j)
 	enddo
     enddo
  
  end subroutine Tri_diag
+ 
  subroutine LU(a,b,c,r,m,n)
     !Gauss elimination method/Chasing method  with periodic boundary
     ! on Wang's book P159
@@ -331,8 +321,10 @@ subroutine euler(dt,iter)
 !  	     |c     a b|
 subroutine tridiagnol_solver5(b,a,c,r,LN,M,np)
     use communicate
+    use mpi
+    
     implicit none
-    include 'mpif.h'
+    !include 'mpif.h'
 
     integer :: i,j
     integer :: rank,np,err ! MPI parameters
